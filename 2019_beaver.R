@@ -31,6 +31,8 @@ library(esquisse)
 library(zoo)
 library(naniar)
 library(stringr)
+library(insol)
+library(aspace)
 
 # Set working drive
 setwd("/Users/simontye/Documents/Research/Projects/Castor_canadensis/2019_Beaver")
@@ -46,7 +48,7 @@ weather$Date <- as.Date(weather$Date, "%m/%d/%y")
 # Group beavers into age classes
 beaver$Beaver_Adult <- (beaver$Beaver_Male + beaver$Beaver_Female + beaver$Beaver_Unknown)
 
-# Calculate number of images per day
+# Reformat columns for date and number of images
 date <- table(beaver$Date)
 date <- as.data.frame.table(date) 
 colnames(date)[c(1,2)] <- c("Date", "Images")
@@ -170,6 +172,8 @@ ggplot(data = beaver.day, aes(x = Date)) +
 ### Lodge Maintenance - Materials - Data
 ###############################################################
 
+##### NEED TO ACCOUNT FOR IMAGE / DAY # ADD IN IMAGES COLUMN
+
 # Subset beaver dataframe by lodge materials
 lodge.1 <- subset(data, select = c(ID, Date, Month, Week, Time, Hour, Temp, Precip, Discharge, Height, Lake_Frozen, Maintenance_1, Maintenance_1V, Maintenance_1H))
 lodge.2 <- subset(data, select = c(ID, Date, Month, Week, Time, Hour, Temp, Precip, Discharge, Height, Lake_Frozen, Maintenance_2, Maintenance_2V, Maintenance_2H))
@@ -281,6 +285,8 @@ lodge.month$Month <- factor(lodge.month$Month, levels = c("12", "1", "2", "3", "
 ### Lodge Maintenance - Materials - Figures
 ###############################################################
 
+##### NEED TO ACCOUNT FOR IMAGE / DAY # ADD IN IMAGES COLUMN
+
 # AMS: Lodge maintenance (as proportion of images per day (left axis) compared to air temp a NOAA station (right axis).
 # Dark / light bars are adults/kits respectively.
 # Dark green dots are days when the lake was frozen.
@@ -377,20 +383,25 @@ ggplot(data = materials, aes(x = Horizontal, y = Vertical)) +
 ###############################################################
 
 # Subset main dataframe by animal columns
-animal.1 <- subset(data, select = c(ID, Date, Week, Month, Time, Hour,
+animal.1 <- subset(data, select = c(ID, Images, Date, Week, Month, Time, Hour,
                                     Lake_Frozen, Temp, Precip, Discharge, Height,
-                                    Animal_1, Animal_1_Count))
-animal.2 <- subset(data, select = c(ID, Date, Week, Month, Time, Hour,
+                                    Animal_1, Animal_1_Count, Beaver_Count))
+
+animal.2 <- subset(data, select = c(ID, Images, Date, Week, Month, Time, Hour,
                                     Lake_Frozen, Temp, Precip, Discharge, Height,
                                     Animal_2, Animal_2_Count))
-animal.3 <- subset(data, select = c(ID, Date, Week, Month, Time, Hour,
+animal.2$Beaver_Count <- rep(0)
+
+animal.3 <- subset(data, select = c(ID, Images, Date, Week, Month, Time, Hour,
                                     Lake_Frozen, Temp, Precip, Discharge, Height,
                                     Animal_3, Animal_3_Count))
 
+animal.3$Beaver_Count <- rep(0)
+
 # Rename columns
-colnames(animal.1)[c(12, 13)] <- c("Animal","Animal_Count")
-colnames(animal.2)[c(12, 13)] <- c("Animal","Animal_Count")
-colnames(animal.3)[c(12, 13)] <- c("Animal","Animal_Count")
+colnames(animal.1)[c(13:15)] <- c("Animal","Animal_Count", "Beaver")
+colnames(animal.2)[c(13:15)] <- c("Animal","Animal_Count", "Beaver")
+colnames(animal.3)[c(13:15)] <- c("Animal","Animal_Count", "Beaver")
 
 # Merge dataframes
 animals <- rbind(animal.1, animal.2, animal.3)
@@ -403,9 +414,6 @@ names(table(animals$Animal))
 
 # Separate organism and species into different columns (Warning from "Unknown" organisms (No species name available))
 animals <- separate(data = animals, col = "Animal", into = c("Organism", "Species"), sep = "_")
-
-# Remove NAs
-animals <- na.omit(animals)
 
 # Create column for each species
 animals$AmericanBullfrog <- ifelse(animals$Species == "AmericanBullfrog" & animals$Animal_Count > 0, animals$Animal_Count, 0)
@@ -438,64 +446,24 @@ animals$Raccoon <- ifelse(animals$Species == "Raccoon" & animals$Animal_Count > 
 animals$Small <- ifelse(animals$Species == "Small" & animals$Animal_Count > 0, animals$Animal_Count, 0)
 animals$PaintedTurtle <- ifelse(animals$Species == "PaintedTurtle" & animals$Animal_Count > 0, animals$Animal_Count, 0)
 
-# Redo organism column
-animals$Amphibian <- ifelse(animals$Organism == "Amphibian", 1, 0)
-animals$Bird      <- ifelse(animals$Organism == "Bird", 1, 0)
-animals$Mammal    <- ifelse(animals$Organism == "Mammal", 1, 0)
-animals$Reptile   <- ifelse(animals$Organism == "Reptile", 1, 0)
+# Add organism columns
+animals$Amphibian <- ifelse(animals$Organism == "Amphibian", animals$Animal_Count, 0)
+animals$Bird      <- ifelse(animals$Organism == "Bird", animals$Animal_Count, 0)
+animals$Mammal    <- ifelse(animals$Organism == "Mammal", animals$Animal_Count, 0)
+animals$Reptile   <- ifelse(animals$Organism == "Reptile", animals$Animal_Count, 0)
 
-############################
-############################
-############################
-############################
-############################
-############################
-############################
-
-# Create column for all animal observations
-animals$All_Animals <- (animals$All_Amphibians +
-                          animals$All_Birds +
-                          animals$All_Mammals +
-                          animals$All_Reptiles +
-                          animals$Unknown)
+# Remove unnecessary columns
+animals[,c("Organism", "Animal_Count")] <- NULL
 
 # Create amphibian dataframe
-animals$All_Amphibians <- (animals$AmericanBullfrog +
-                             animals$Amphibian)
-
-amphibians <- subset(animals, select = c(Date, Week, Month, Time, Hour,
+amphibians <- subset(animals, select = c(Date, Images, Week, Month, Time, Hour,
                                          Lake_Frozen, Temp, Precip, Discharge, Height,
-                                         Organism, Species,  All_Amphibians, AmericanBullfrog, Amphibian))
+                                         Amphibian, AmericanBullfrog))
 
 # Create bird dataframe
-animals$All_Birds <- (animals$AmericanCoot +
-                        animals$BeltedKingfisher +
-                        animals$Bird +
-                        animals$BlackCrownedNightHeron +
-                        animals$BlueWingedTeal +
-                        animals$CanadaGoose +
-                        animals$CattleEgret +
-                        animals$EasternKingbird +
-                        animals$EuropeanStarling +
-                        animals$Grackle +
-                        animals$GreatBlueHeron +
-                        animals$GreatEgret +
-                        animals$GreatHornedOwl +
-                        animals$GreenHeron +
-                        animals$InteriorLeastTern +
-                        animals$LittleBlueHeron +
-                        animals$Meadowlark +
-                        animals$NorthernHarrier +
-                        animals$RedTailedHawk +
-                        animals$RedWingedBlackbird +
-                        animals$WoodDuck +
-                        animals$YellowCrownedNightHeron +
-                        animals$YellowHeadedBlackbird +
-                        animals$YellowWarbler)
-
-birds <- subset(animals, select = c(ID, Date, Week, Month, Time, Hour,
-                                    Lake_Frozen, Temp, Precip, Discharge, Height,
-                                    Organism, Species,  All_Birds, AmericanCoot, BeltedKingfisher,
+birds <- subset(animals, select = c(ID, Images, Date, Week, Month, Time, Hour,
+                                    Lake_Frozen, Temp, Precip, Discharge, Height, Species,
+                                    Bird, AmericanCoot, BeltedKingfisher,
                                     Bird, BlackCrownedNightHeron, BlueWingedTeal, CanadaGoose,
                                     CattleEgret, EasternKingbird, EuropeanStarling, Grackle,
                                     GreatBlueHeron, GreatEgret, GreatHornedOwl, GreenHeron,
@@ -526,64 +494,72 @@ birds$Group <- ifelse(birds$Species == "AmericanCoot", "Waterfowl",
                                                                                                                                                            ifelse(birds$Species == 'YellowWarbler', 'Passerine', 'Other')))))))))))))))))))))
                       
 # Create mammal dataframe
-animals$All_Mammals <- (animals$Mammal +
-                          animals$Muskrat +
-                          animals$NorthernRiverOtter +
-                          animals$Raccoon +
-                          animals$Small)
+mammals <- subset(animals, select = c(Date, Images, Week, Month, Time, Hour,
+                                      Lake_Frozen, Temp, Precip, Discharge, Height,
+                                      Mammal, Muskrat, NorthernRiverOtter,
+                                      Raccoon, Small))
 
 # Create reptile dataframe
-animals$All_Reptiles <- (animals$PaintedTurtle +
-                           animals$Reptile)
+reptiles <- subset(animals, select = c(Date, Images, Week, Month, Time, Hour,
+                                       Lake_Frozen, Temp, Precip, Discharge, Height,
+                                       Reptile, PaintedTurtle))
 
-animals$All_Animals <- (animals$All_Amphibians +
-                          animals$All_Birds +
-                          animals$All_Mammals +
-                          animals$All_Reptiles +
-                          animals$Unknown)
+# Replace NAs with 0s
+animals[is.na(animals)] <- 0
 
-# Create organisms dataframe
-#organisms <- animals[,c(1:13,48:52)]
-
-# Remove unnecessary columns
-animals[,c("Animal_Count")] <- NULL
+# Create dataframe of daily totals
+animals.day <- animals %>%
+  group_by(Date) %>%
+  summarize(
+    Temp                      = (mean(Temp)),
+    Discharge                 = (mean(Discharge)),
+    Beaver                    = (sum(Beaver) / mean(Images)) * 100,
+    AmericanBullfrog          = (sum(AmericanBullfrog) / mean(Images)) * 100,
+    AmericanCoot              = (sum(AmericanCoot) / mean(Images)) * 100,
+    BeltedKingfisher          = (sum(BeltedKingfisher) / mean(Images)) * 100,
+    BlackCrownedNightHeron    = (sum(BlackCrownedNightHeron) / mean(Images)) * 100,
+    BlueWingedTeal            = (sum(BlueWingedTeal) / mean(Images)) * 100,
+    CanadaGoose               = (sum(CanadaGoose) / mean(Images)) * 100,
+    CattleEgret               = (sum(CattleEgret) / mean(Images)) * 100,
+    EasternKingbird           = (sum(EasternKingbird) / mean(Images)) * 100,
+    EuropeanStarling          = (sum(EuropeanStarling) / mean(Images)) * 100,
+    Grackle                   = (sum(Grackle) / mean(Images)) * 100,
+    GreatBlueHeron            = (sum(GreatBlueHeron) / mean(Images)) * 100,
+    GreatEgret                = (sum(GreatEgret) / mean(Images)) * 100,
+    GreatHornedOwl            = (sum(GreatHornedOwl) / mean(Images)) * 100,
+    GreenHeron                = (sum(GreenHeron) / mean(Images)) * 100,
+    InteriorLeastTern         = (sum(InteriorLeastTern) / mean(Images)) * 100,
+    LittleBlueHeron           = (sum(LittleBlueHeron) / mean(Images)) * 100,
+    Meadowlark                = (sum(Meadowlark) / mean(Images)) * 100,
+    NorthernHarrier           = (sum(NorthernHarrier) / mean(Images)) * 100,
+    RedTailedHawk             = (sum(RedTailedHawk) / mean(Images)) * 100,
+    RedWingedBlackbird        = (sum(RedWingedBlackbird) / mean(Images)) * 100,
+    WoodDuck                  = (sum(WoodDuck) / mean(Images)) * 100,
+    YellowCrownedNightHeron   = (sum(YellowCrownedNightHeron) / mean(Images)) * 100,
+    YellowHeadedBlackbird     = (sum(YellowHeadedBlackbird) / mean(Images)) * 100,
+    YellowWarbler             = (sum(YellowWarbler) / mean(Images)) * 100,
+    Muskrat                   = (sum(Muskrat) / mean(Images)) * 100,
+    NorthernRiverOtter        = (sum(NorthernRiverOtter) / mean(Images)) * 100,
+    Raccoon                   = (sum(Raccoon) / mean(Images)) * 100,
+    Small                     = (sum(Small) / mean(Images)) * 100,
+    PaintedTurtle             = (sum(PaintedTurtle) / mean(Images)) * 100,
+    Amphibian                 = (sum(Amphibian) / mean(Images)) * 100,
+    Bird                      = (sum(Bird) / mean(Images)) * 100,
+    Mammal                    = (sum(Mammal) / mean(Images)) * 100,
+    Reptile                   = (sum(Reptile) / mean(Images)) * 100)
 
 ###############################################################
 ### Animal Activity - Figures
 ###############################################################
 
-ggplot(data = animals, aes(x = Week)) +
-  geom_bar(aes(y = All_Reptiles), position = "dodge", stat = "identity", fill = "green", size = 0.8) +
-  geom_bar(aes(y = All_Mammals), position = "dodge", stat = "identity", fill = "orange", size = 0.8) +
-  geom_bar(aes(y = All_Birds), position = "dodge", stat = "identity", fill = "blue", size = 0.8) +
-  geom_bar(aes(y = All_Amphibians), position = "dodge", stat = "identity", fill = "red", size = 0.8) +
-  geom_line(aes(y = Discharge / 20)) +
-  #scale_x_date(date_labels = "%b", date_breaks = "1 month") +
-  #scale_y_continuous(limits = c(0, 15), sec.axis = sec_axis(~.* 20, name = expression("Discharge (m"^"3"*"/sec)"))) +
-  theme_bw(base_size = 12) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.border = element_blank(),
-        axis.line = element_line(color = "black", size = .25, lineend = "square"),
-        axis.ticks = element_line(color = "black", size = .25), axis.title = element_text(color = "black"),
-        axis.text.y = element_text(color = "black"), axis.text.x = element_text(color = "black")) +
-  labs(x = "Month",y = "Percent of images")
+#### Not working??
 
-ggplot(data = animals, aes(x = Month)) +
-  geom_bar(aes(y = All_Birds, color = Species), position = "dodge", stat = "identity", size = 0.8) +
-  geom_line(aes(y = Discharge / 20)) +
-  #scale_x_date(date_labels = "%b", date_breaks = "1 month") +
-  #scale_y_continuous(limits = c(0, 15), sec.axis = sec_axis(~.* 20, name = expression("Discharge (m"^"3"*"/sec)"))) +
-  theme_bw(base_size = 12) +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.border = element_blank(),
-        axis.line = element_line(color = "black", size = .25, lineend = "square"),
-        axis.ticks = element_line(color = "black", size = .25), axis.title = element_text(color = "black"),
-        axis.text.y = element_text(color = "black"), axis.text.x = element_text(color = "black")) +
-  labs(x = "Month",y = "Percent of images")
-
-ggplot(data = birds, aes(x = Month)) +
-  geom_bar(aes(y = All_Birds, fill = Group), position = "dodge", stat = "identity", size = 0.8) +
-  geom_line(aes(y = Discharge / 20)) +
-  #scale_x_date(date_labels = "%b", date_breaks = "1 month") +
-  #scale_y_continuous(limits = c(0, 15), sec.axis = sec_axis(~.* 20, name = expression("Discharge (m"^"3"*"/sec)"))) +
+ggplot(data = animals.day, aes(x = Date)) +
+  geom_bar(aes(y = Amphibian), position = "dodge", stat = "identity", fill = "green", size = 0.8) +
+  geom_bar(aes(y = Bird), position = "dodge", stat = "identity", fill = "blue", size = 0.8) +
+  geom_bar(aes(y = Mammal), position = "dodge", stat = "identity", fill = "orange", size = 0.8) +
+  geom_bar(aes(y = Reptile), position = "dodge", stat = "identity", fill = "darkgoldenrod", size = 0.8) +
+  scale_x_date(date_labels = "%b", date_breaks = "1 month") +
   theme_bw(base_size = 12) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.border = element_blank(),
         axis.line = element_line(color = "black", size = .25, lineend = "square"),
@@ -592,146 +568,280 @@ ggplot(data = birds, aes(x = Month)) +
   labs(x = "Month",y = "Percent of images")
 
 ###############################################################
-###############################################################
-###############################################################
-
-animals[,c("Date", "Week", "Month", "Time", "Hour",
-           "Lake_Frozen", "Temp", "Precip", "Discharge", "Height",
-           "Organism", "Species", "Unknown",
-           "Amphibian", "Bird", "Mammal", "Reptile",
-           "All_Amphibians", "All_Birds", "All_Mammals",
-           "All_Reptiles", "All_Animals")] <- NULL
-
-species <- aggregate(.~ID + AmericanBullfrog + AmericanCoot + BeltedKingfisher + BlackCrownedNightHeron +
-                        BlueWingedTeal + CanadaGoose + CattleEgret + EasternKingbird + EuropeanStarling +
-                        Grackle + GreatBlueHeron + GreatEgret + GreatHornedOwl + GreenHeron + InteriorLeastTern +
-                        LittleBlueHeron + Meadowlark + NorthernHarrier + RedTailedHawk + RedWingedBlackbird +
-                        WoodDuck + YellowCrownedNightHeron + YellowHeadedBlackbird + YellowWarbler + Muskrat +
-                        NorthernRiverOtter + Raccoon + PaintedTurtle, data = animals, sum)
-
-
-#species2 <- cast(animals, ~ID + AmericanBullfrog + AmericanCoot + BeltedKingfisher + BlackCrownedNightHeron +
-                   #BlueWingedTeal + CanadaGoose + CattleEgret + EasternKingbird + EuropeanStarling +
-                   #Grackle + GreatBlueHeron + GreatEgret + GreatHornedOwl + GreenHeron + InteriorLeastTern +
-                   #LittleBlueHeron + Meadowlark + NorthernHarrier + RedTailedHawk + RedWingedBlackbird +
-                   #WoodDuck + YellowCrownedNightHeron + YellowHeadedBlackbird + YellowWarbler + Muskrat +
-                   #NorthernRiverOtter + Raccoon + PaintedTurtle, sum)
-
-# Model 1
-sa1 <- specaccum(species)
-mod1 <- fitspecaccum(sa1, "lomolino")
-coef(mod1)
-fitted(mod1)
-plot(sa1)
-plot(mod1, add = TRUE, col = 2, lwd = 2)
-
-# Model 2
-sa1 <- specaccum(species, "random")
-plot(sa1, col = "hotpink")
-boxplot(mod2, col = "yellow", border = "blue", lty = 1, cex = 0.3, add = TRUE)
-sapply(mod2$models, AIC)
-
-ggplot(mod2) +
-  geom_line(aes(x = sites, y = richness))
-
-## S3 method for class 'specaccum':
-plot(species, add = FALSE, ci = 2, ci.type = c("bar", "line", "polygon"), 
-     col = par("fg"), ci.col = col, ci.lty = 1, xlab = "ID")
-
-plot(species, add = FALSE, ci = 2, ci.type = c("bar", "line", "polygon"), 
-     col = par("fg"), ci.col = col, ci.lty = 1, xlab = "ID")
-
-## S3 method for class 'specaccum':
-boxplot(X)
-
-###############################################################
-###############################################################
+### ANNUAL CLOCK FOR BEAVER PAPER
 ###############################################################
 
-#species <- na.omit(species)
+# Add Julian days to animals.day
+animals.day$Date   <- as.POSIXct(animals.day$Date, format="%Y-%m-%d")
+animals.day$Julian <- JD(animals.day$Date, inverse = FALSE)
+animals.day$Julian <- (animals.day$Julian - 2457358.5)
 
-species$Species <- ifelse(species$Species == "GreatHornedOwl", "1",
-                      ifelse(species$Species == 'Small', '2',
-                             ifelse(species$Species == 'Muskrat', '3',
-                                    ifelse(species$Species == 'AmericanCoot', '4',
-                                           ifelse(species$Species == 'NorthernRiverOtter', '5',
-                                                  ifelse(species$Species == 'RedWingedBlackbird', '6',
-                                                         ifelse(species$Species == 'BeltedKingfisher', '7',
-                                                                ifelse(species$Species == 'CanadaGoose', '8',
-                                                                       ifelse(species$Species == 'BlueWingedTeal', '9',
-                                                                              ifelse(species$Species == 'NorthernHarrier', '10',
-                                                                                     ifelse(species$Species == 'Raccoon', '11',
-                                                                                            ifelse(species$Species == 'RedTailedHawk', '12',
-                                                                                                   ifelse(species$Species == 'Grackle', '13',
-                                                                                                          ifelse(species$Species == 'YellowHeadedBlackbird', '14',
-                                                                                                                 ifelse(species$Species == 'PaintedTurtle', '15',
-                                                                                                                        ifelse(species$Species == 'CattleEgret', '16',
-                                                                                                                               ifelse(species$Species == 'InteriorLeastTern', '17',
-                                                                                                                                      ifelse(species$Species == 'EasternKingbird', '18',
-                                                                                                                                             ifelse(species$Species == 'EuropeanStarling', '19',
-                                                                                                                                                    ifelse(species$Species == 'LittleBlueHeron', '20',
-                                                                                                                                                           ifelse(species$Species == 'GreenHeron', '21',
-                                                                                                                                                                  ifelse(species$Species == 'YellowCrownedNightHeron', '22',
-                                                                                                                                                                         ifelse(species$Species == 'GreatBlueHeron', '23',
-                                                                                                                                                                                ifelse(species$Species == 'WoodDuck', '24',
-                                                                                                                                                                                       ifelse(species$Species == 'AmericanBullfrog', '25',
-                                                                                                                                                                                              ifelse(species$Species == 'YellowWarbler', '26',
-                                                                                                                                                                                                     ifelse(species$Species == 'Meadowlark', '27','0')))))))))))))))))))))))))))
-# Change from character to numeric
-species$Species <- as.numeric(as.character(species$Species))
+# Convert Julian days to degrees
+animals.day$Degrees <- (animals.day$Julian/366)*360
 
-# Add ID column for image number
-species <- species %>% mutate(ID = row_number())
+# Convery degrees to radians
+animals.day$Radians <- as_radians(animals.day$Degrees)
 
-# Reformat date to days since image acquistion began
-species$Date <- julian(species$Date, origin=as.Date("2015-12-03"))
+###############################################################
+# Beavers
 
-# Subset first observations of each species
-species.images <- slice(species, c(14, 127, 4781, 5770, 5693, 8039, 8162, 8252, 9816, 10196,
-                                   10353, 10466, 11036, 11575, 11666, 12474, 16123, 17326,
-                                   19227, 20372, 20381, 20673, 21229, 23067, 27270, 28061, 30184))
+beaver.radians <- subset(animals.day, select = c(Beaver, Radians))
+beaver.radians$Radians <- ifelse(beaver.radians$Beaver > 0, beaver.radians$Radians, NA)
+beaver.radians <- na.omit(beaver.radians)
+beaver.radians <- as.data.frame(beaver.radians$Radians)
+beaver.radians <- circular(beaver.radians, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
 
-species.day <- slice(species, c(14, 127, 4781, 5770, 5693, 8039, 8162, 8252, 9816, 10196,
-                  10353, 10466, 11036, 11575, 11666, 12474, 16123, 17326,
-                  19227, 20372, 20381, 20673, 21229, 23067, 27270, 28061, 30184))
 
-# Remove NAs
-species <- na.omit(species)
+pdf("annual_beavers.pdf", width = 12, height = 12)
 
-# Remove unnecessary columns and reorder necessary columns
-species.accum.day    <- species.day[,-3]
-species.accum.images <- species.images[,-1]
-species.accum.images <- species.accum.images[c("ID", "Species")]
+plot.circular(beaver.radians, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
 
-# Model 1
-sa1 <- specaccum(species)
-mod1 <- fitspecaccum(sa1, "lomolino")
-coef(mod1)
-fitted(mod1)
-plot(sa1)
-plot(mod1, add = TRUE, col = 2, lwd = 2)
+rose.diag(beaver.radians, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
 
-# Model 2
-mod2 <- specaccum(species, "arrhenius")
-plot(mod2, col = "hotpink")
-boxplot(sp2, col = "yellow", border = "blue", lty = 1, cex = 0.3, add = TRUE)
-sapply(mod2$models, AIC)
+lines(density.circular(beaver.radians, bw = 40), zero = pi/2, rotation = "clock")
 
-## S3 method for class 'specaccum':
-plot(species.images.accum, add = FALSE, ci = 2, ci.type = c("bar", "line", "polygon"), 
-     col = par("fg"), ci.col = col, ci.lty = 1, xlab = "Species")
+#beaver.annual.fa <- fitact(beaver.radians, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
 
-plot(species.day.accum, add = FALSE, ci = 2, ci.type = c("bar", "line", "polygon"), 
-     col = par("fg"), ci.col = col, ci.lty = 1, xlab = "Days")
+dev.off()
 
-## S3 method for class 'specaccum':
-boxplot(X)
+###############################################################
+# Amphibians
+
+amphibians.radians <- subset(animals.day, select = c(Amphibian, Radians))
+amphibians.radians$Radians <- ifelse(amphibians.radians$Amphibian > 0, amphibians.radians$Radians, NA)
+amphibians.radians <- na.omit(amphibians.radians)
+amphibians.radians <- as.data.frame(amphibians.radians$Radians)
+amphibians.radians <- circular(amphibians.radians, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
+
+pdf("annual_amphibians.pdf", width = 12, height = 12)
+
+plot.circular(amphibians.radians, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
+
+rose.diag(amphibians.radians, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
+
+lines(density.circular(amphibians.radians, bw = 40), zero = pi/2, rotation = "clock")
+
+#amphibians.annual.fa <- fitact(amphibians.radians, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
+
+dev.off()
+
+###############################################################
+# Birds
+
+birds.radians <- subset(animals.day, select = c(Bird, Radians))
+birds.radians$Radians <- ifelse(birds.radians$Bird > 0, birds.radians$Radians, NA)
+birds.radians <- na.omit(birds.radians)
+birds.radians <- as.data.frame(birds.radians$Radians)
+birds.radians <- circular(birds.radians, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
+
+pdf("annual_birds.pdf", width = 12, height = 12)
+
+plot.circular(birds.radians, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
+
+rose.diag(birds.radians, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
+
+lines(density.circular(birds.radians, bw = 40), zero = pi/2, rotation = "clock")
+
+#birds.annual.fa <- fitact(birds.radians, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
+
+dev.off()
+
+###############################################################
+# Mammals
+
+mammals.radians <- subset(animals.day, select = c(Mammal, Radians))
+mammals.radians$Radians <- ifelse(mammals.radians$Mammal > 0, mammals.radians$Radians, NA)
+mammals.radians <- na.omit(mammals.radians)
+mammals.radians <- as.data.frame(mammals.radians$Radians)
+mammals.radians <- circular(mammals.radians, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
+
+pdf("annual_mammals.pdf", width = 12, height = 12)
+
+plot.circular(mammals.radians, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
+
+rose.diag(mammals.radians, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
+
+lines(density.circular(mammals.radians, bw = 40), zero = pi/2, rotation = "clock")
+
+#mammals.annual.fa <- fitact(mammals.radians, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
+
+dev.off()
+
+###############################################################
+# Reptiles
+
+reptiles.radians <- subset(animals.day, select = c(Reptile, Radians))
+reptiles.radians$Radians <- ifelse(reptiles.radians$Reptile > 0, reptiles.radians$Radians, NA)
+reptiles.radians <- na.omit(reptiles.radians)
+reptiles.radians <- as.data.frame(reptiles.radians$Radians)
+reptiles.radians <- circular(reptiles.radians, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
+
+pdf("annual_reptiles.pdf", width = 12, height = 12)
+
+plot.circular(reptiles.radians, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
+
+rose.diag(reptiles.radians, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
+
+lines(density.circular(reptiles.radians, bw = 40), zero = pi/2, rotation = "clock")
+
+#reptiles.annual.fa <- fitact(reptiles.radians, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
+
+dev.off()
+
+###############################################################
+### DAILY CLOCK FOR BEAVER PAPER
+###############################################################
+
+# Convert time of day to radians
+animals.hour <- subset(animals, select = c(Time, Beaver, Amphibian, Bird, Mammal, Reptile))
+animals.hour$Time <- as.POSIXct(animals.hour$Time, format="%H:%M:%S", units = "mins")
+animals.hour$Time <- strptime(animals.hour$Time, "%Y-%m-%d %H:%M:%S")
+animals.hour$Time <- ymd_hms(animals.hour$Time)
+animals.hour$Time <- as.numeric(format(animals.hour$Time, "%H")) +
+  (as.numeric(format(animals.hour$Time, "%M")) / 60)
+animals.hour$Time <- (animals.hour$Time * 60 / 229.1831180523)
+
+# Rename Time to Radians (so very similar code works for both clocks)
+colnames(animals.hour)[c(1)] <- c("Radians")
+
+###############################################################
+# Beavers
+
+beaver.radians2 <- subset(animals.hour, select = c(Beaver, Radians))
+beaver.radians2$Radians <- ifelse(beaver.radians2$Beaver > 0, beaver.radians2$Radians, NA)
+beaver.radians2 <- na.omit(beaver.radians2)
+beaver.radians2 <- as.data.frame(beaver.radians2$Radians)
+beaver.radians2 <- circular(beaver.radians2, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
+
+pdf("daily_beavers.pdf", width = 12, height = 12)
+
+plot.circular(beaver.radians2, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
+
+rose.diag(beaver.radians2, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
+
+lines(density.circular(beaver.radians2, bw = 40), zero = pi/2, rotation = "clock")
+
+#beaver.annual.fa <- fitact(beaver.radians2, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
+
+dev.off()
+
+###############################################################
+# Amphibians
+
+amphibians.radians2 <- subset(animals.hour, select = c(Amphibian, Radians))
+amphibians.radians2$Radians <- ifelse(amphibians.radians2$Amphibian > 0, amphibians.radians2$Radians, NA)
+amphibians.radians2 <- na.omit(amphibians.radians2)
+amphibians.radians2 <- as.data.frame(amphibians.radians2$Radians)
+amphibians.radians2 <- circular(amphibians.radians2, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
+
+pdf("daily_amphibians.pdf", width = 12, height = 12)
+
+plot.circular(amphibians.radians2, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
+
+rose.diag(amphibians.radians2, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
+
+lines(density.circular(amphibians.radians2, bw = 40), zero = pi/2, rotation = "clock")
+
+#amphibians.annual.fa <- fitact(amphibians.radians2, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
+
+dev.off()
+
+###############################################################
+# Birds
+
+birds.radians2 <- subset(animals.hour, select = c(Bird, Radians))
+birds.radians2$Radians <- ifelse(birds.radians2$Bird > 0, birds.radians2$Radians, NA)
+birds.radians2 <- na.omit(birds.radians2)
+birds.radians2 <- as.data.frame(birds.radians2$Radians)
+birds.radians2 <- circular(birds.radians2, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
+
+pdf("daily_birds.pdf", width = 12, height = 12)
+
+plot.circular(birds.radians2, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
+
+rose.diag(birds.radians2, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
+
+lines(density.circular(birds.radians2, bw = 40), zero = pi/2, rotation = "clock")
+
+#birds.annual.fa <- fitact(birds.radians2, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
+
+dev.off()
+
+###############################################################
+# Mammals
+
+mammals.radians2 <- subset(animals.hour, select = c(Mammal, Radians))
+mammals.radians2$Radians <- ifelse(mammals.radians2$Mammal > 0, mammals.radians2$Radians, NA)
+mammals.radians2 <- na.omit(mammals.radians2)
+mammals.radians2 <- as.data.frame(mammals.radians2$Radians)
+mammals.radians2 <- circular(mammals.radians2, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
+
+pdf("daily_mammals.pdf", width = 12, height = 12)
+
+plot.circular(mammals.radians2, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
+
+rose.diag(mammals.radians2, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
+
+lines(density.circular(mammals.radians2, bw = 40), zero = pi/2, rotation = "clock")
+
+#mammals.annual.fa <- fitact(mammals.radians2, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
+
+dev.off()
+
+###############################################################
+# Reptiles
+
+reptiles.radians2 <- subset(animals.hour, select = c(Reptile, Radians))
+reptiles.radians2$Radians <- ifelse(reptiles.radians2$Reptile > 0, reptiles.radians2$Radians, NA)
+reptiles.radians2 <- na.omit(reptiles.radians2)
+reptiles.radians2 <- as.data.frame(reptiles.radians2$Radians)
+reptiles.radians2 <- circular(reptiles.radians2, units = "radians", template = "clock24", modulo = "2pi", zero = 0, rotation = "clock")
+
+pdf("daily_reptiles.pdf", width = 12, height = 12)
+
+plot.circular(reptiles.radians2, pch = 16, cex = .7, stack = TRUE, axes = TRUE, sep = 0.04, shrink = 2.5,
+              bins = 225, ticks = TRUE, tcl = 0.05, zero = pi/2, template = "clock24")
+
+rose.diag(reptiles.radians2, bins = 24, col = "dark gray", prop = 1.5,add = TRUE, rotation = "clock",
+          zero = pi/2, axes = FALSE)
+daily.reptiles.pdf <- lines(density.circular(reptiles.radians2, bw = 40), zero = pi/2, rotation = "clock")
+
+#reptiles.annual.fa <- fitact(reptiles.radians2, wt = NULL, reps = 1000, bw = NULL, adj = 1, sample = c("data"))
+
+dev.off()
 
 ###############################################################
 ###############################################################
 ###############################################################
+###############################################################
+###############################################################
+###############################################################
+###############################################################
+###############################################################
+###############################################################
 
-species <- animals()
-data(BCI, BCI.env)
-head(BCI.env)
+
+
+
+
+
+
 
